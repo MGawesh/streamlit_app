@@ -3,4 +3,8 @@ numpy
 matplotlib
 seaborn
 plotly
+<<<<<<< HEAD
 streamlit
+=======
+streamlit
+>>>>>>> f10b664cbb8c437d9b4b4f4e8a091ff8296dc638
