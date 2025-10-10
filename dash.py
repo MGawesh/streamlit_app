@@ -116,6 +116,32 @@ elif st.session_state['page'] == 'time_series':
         return pd.Series({'avg_daily':avg_daily})
     avg_sales=pharmacy_data.groupby([pd.Grouper(key='InvoiceDate',freq='M'),'SalesName']).apply(func).unstack()
     avg_sales
+    
+
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+
+# رسم خط لكل صيدلي
+    for col in avg_sales.columns:
+        fig.add_trace(go.Scatter(
+            x=avg_sales.index,
+            y=avg_sales[col],
+            mode='lines+markers',
+            name=str(col)))
+
+# تنسيق الشكل العام
+    fig.update_layout(
+        title="Average Daily Sales per Pharmacist",
+        xaxis_title="Month",
+        yaxis_title="Average Daily Sales",
+        template="plotly_white",
+        hovermode="x unified",
+        legend_title="Pharmacist",
+        height=600)
+
+    st.plotly_chart(fig, use_container_width=True)
+
 
     
 
