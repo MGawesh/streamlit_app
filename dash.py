@@ -20,7 +20,7 @@ pharmacy_no = df['BranchCode'].unique().tolist()
 st.sidebar.title('Branch')
 selected_pharmacy = st.sidebar.selectbox(options=pharmacy_no, label='Choose pharmacy')
 pharmacy_data = df[df['BranchCode'] == selected_pharmacy]
-
+st.sidebar.markdown('[collect data](https://script.google.com/macros/s/AKfycbzXwJ4ExBn6bjPc7RUDmDqlTDfU9Q9dHO1BnjkCICAFAJsaidL8br7RPZZZSDtKP6hf/exec)')
 # --- تهيئة session_state ---
 if 'page' not in st.session_state:
     st.session_state['page'] = 'home'
