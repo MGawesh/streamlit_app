@@ -120,10 +120,11 @@ elif st.session_state['page'] == 'time_series':
     
 
 # رسم خط لكل صيدلي
+    fig,ax =plt.subplots(figsize=12,8)
     for col in avg_sales.columns:
-        fig=px.line(avg_sales,x=avg_sales.index,y=col)
+        sns.lineplot(data=avg_sales,x=avg_sales.index,y=col)
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.pyplot(fig)
 
 
     
