@@ -51,27 +51,47 @@ elif st.session_state['page'] == 'time_series':
         cash_sales = cash['ItemsNetPrice'].sum()
         insurance = n[n['InvoiceType'].str.lower().str.contains('insurance')]['ItemsNetPrice'].sum()
         wasfaty = n[n['InvoiceType'].str.lower().str.contains('wasfaty')]['ItemsNetPrice'].sum()
+
+        total_trans=n['InvoiceNumber'].nunique()
+        cash_trans=n[n['InvoiceType'].str.lower().str.contains('normal|online|cash')]['InvoiceNumber'].nunique()
+        ins_trans=n[n['InvoiceType'].str.lower().str.contains('insurance')]['InvoiceNumber'].nunique()
+        wasf_trans=n[n['InvoiceType'].str.lower().str.contains('wasfaty')]['InvoiceNumber'].nunique()
         return pd.Series({
             'total': total,
             'cash_sales': cash_sales,
             'insurance': insurance,
-            'wasfaty': wasfaty
+            'wasfaty': wasfaty,
+            'total_trans':total_trans,
+            'cash_trans':cash_trans,
+            'ins_trans':ins_trans,
+            'wasf_trans':wasf_trans
         })
 
     def process_data(pharmacy_data):
         data = pharmacy_data.groupby(pd.Grouper(key='InvoiceDate', freq='M')).apply(func)
         return data
+    
 
     data = process_data(pharmacy_data)
-    st.dataframe(data)
-
+    total_sales_col=['total','cash_sales','insurance','wasfaty']
+    st.dataframe(data[total_sales_col])
+    data_scaled=(data-data.min())/(data.max()-data.min())
+    
+    trans_col=['total_trans','cash_trans','ins_trans','wasf_trans']
     st.subheader('Visuals')
     fig, axes = plt.subplots(2, 2, figsize=(14, 8))
     axes = axes.ravel()
-    for idx, col in enumerate(data.columns):
-        sns.lineplot(data=data, x=data.index.astype(str), y=col, ax=axes[idx])
+    for idx, (sales, trans) in enumerate(zip(total_sales_col, trans_col)):
+        ax = axes[idx]
+        ax2 = ax.twinx()  # محور y ثانٍ للـ transactions
+
+    # رسم المبيعات
+        sns.lineplot(data=data_scaled, x=data_scaled.index.astype(str), y=sales, ax=ax, color='blue', marker='o', label='Sales')
+    # رسم عدد المعاملات
+        sns.lineplot(data=data_scaled, x=data_scaled.index.astype(str), y=trans, ax=ax2, color='red', marker='x', label='Transactions')
         axes[idx].grid()
-        axes[idx].set_title(col.upper(), fontsize=18)
+        ax.set_title(f"{sales.upper()} & {trans.upper()}", fontsize=16)
+        axes[idx].tick_params(rotation=90)
     plt.tight_layout()
     st.pyplot(plt)
 
@@ -120,10 +140,11 @@ elif st.session_state['page'] == 'time_series':
     
 
 # رسم خط لكل صيدلي
-    fig,ax =plt.subplots(figsize=12,8)
+    fig,ax =plt.subplots(figsize=(12,8))
     for col in avg_sales.columns:
-        sns.lineplot(data=avg_sales,x=avg_sales.index,y=col)
-    
+        sns.lineplot(data=avg_sales,x=avg_sales.index,y=col,label=col)
+    plt.grid()
+    plt.legend()
     st.pyplot(fig)
 
 
