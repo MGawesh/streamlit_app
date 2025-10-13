@@ -83,7 +83,7 @@ elif st.session_state['page'] == 'time_series':
     axes = axes.ravel()
     for idx, (sales, trans) in enumerate(zip(total_sales_col, trans_col)):
         ax = axes[idx]
-        ax2 = ax.twinx()  # محور y ثانٍ للـ transactions
+        ax2=ax.twinx()  # محور y ثانٍ للـ transactions
 
     # رسم المبيعات
         sns.lineplot(data=data_scaled, x=data_scaled.index.astype(str), y=sales, ax=ax, color='blue', marker='o', label='Sales')
@@ -156,5 +156,43 @@ elif st.session_state['page'] == 'time_series':
 # --- صفحة تحليل الفئات (Category Analysis) ---
 elif st.session_state['page'] == 'category_analysis':
     st.markdown(f"<h1 style='text-align: center;'>📦 Category Analysis - Branch {selected_pharmacy}</h1>", unsafe_allow_html=True)
-    st.info("🚧 سيتم إضافة تحليل الفئات لاحقًا...")
+    cat_sales=pharmacy_data.groupby('InvoiceType')['ItemsNetPrice'].sum().reset_index()
+    cat_sales['%']=round((cat_sales['ItemsNetPrice']/(cat_sales['ItemsNetPrice'].sum()))*100,2)
+    cat_sales
+    def func(n):
+        ins_sales=n[n['InvoiceType'].str.lower().str.contains('insurance')]['ItemsNetPrice'].sum()
+        was_sales=n[n['InvoiceType'].str.lower().str.contains('wasfaty')]['ItemsNetPrice'].sum()
+        ins_trans=n[n['InvoiceType'].str.lower().str.contains('insurance')]['InvoiceNumber'].nunique()
+        was_trans=n[n['InvoiceType'].str.lower().str.contains('wasfaty')]['InvoiceNumber'].nunique()
+        ins_apt=ins_sales/ins_trans
+        was_apt=was_sales/was_trans
+        return pd.Series({'ins_sales':ins_sales,
+                          'was_sales':was_sales,
+                          'ins_trans':ins_trans,
+                          'was_trans':was_trans,
+                          'ins_apt':ins_apt,
+                          'was_apt':was_apt})
+    cat=pharmacy_data.groupby(pd.Grouper(key='InvoiceDate',freq='M')).apply(func)
+    cat
+    cat_scaled=(cat-cat.min())/(cat.max()-cat.min())
+    
+    fig,axes=plt.subplots(1,2,figsize=(20,6))
+    axes=axes.ravel()
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=cat_scaled['ins_sales'].rolling(window=3).mean(),ax=axes[0],label='ins_sales',marker='o')
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=cat_scaled['ins_trans'].rolling(window=3).mean(),ax=axes[0],label='ins_trans',marker='o')
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=cat_scaled['ins_apt'].rolling(window=3).mean(),ax=axes[0],label='ins_apt',marker='o')
+    axes[0].grid()
+    axes[0].legend()
+    axes[0].set_title('insurance performance')
+
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=cat_scaled['was_sales'],ax=axes[1],label='ins_sales',marker='o')
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=['was_trans'],ax=axes[1],label='ins_trans',marker='o')
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=['was_apt'],ax=axes[1],label='ins_apt',marker='o')
+    axes[1].grid()
+    axes[1].legend()
+    axes[1].set_title('wasfaty performance')
+
+    st.pyplot(plt)
+
     st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
+    
