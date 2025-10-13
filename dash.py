@@ -185,14 +185,20 @@ elif st.session_state['page'] == 'category_analysis':
     axes[0].legend()
     axes[0].set_title('insurance performance')
 
-    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=cat_scaled['was_sales'],ax=axes[1],label='ins_sales',marker='o')
-    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=['was_trans'],ax=axes[1],label='ins_trans',marker='o')
-    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=['was_apt'],ax=axes[1],label='ins_apt',marker='o')
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=cat_scaled['was_sales'].rolling(window=3).mean(),ax=axes[1],label='ins_sales',marker='o')
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=cat_scaled['was_trans'].rolling(window=3).mean(),ax=axes[1],label='ins_trans',marker='o')
+    sns.lineplot(data=cat_scaled,x=cat_scaled.index,y=cat_scaled['was_apt'].rolling(window=3).mean(),ax=axes[1],label='ins_apt',marker='o')
     axes[1].grid()
     axes[1].legend()
     axes[1].set_title('wasfaty performance')
 
     st.pyplot(plt)
+    
+    fig,ax =plt.subplots(figsize=(10,8))
+    cat.corr()
+    sns.heatmap(cat.corr(),annot=True)
+    st.pyplot(fig)
+    
 
     st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
     
