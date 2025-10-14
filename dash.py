@@ -11,7 +11,7 @@ st.title('Main KPIs')
 # --- تحميل البيانات ---
 @st.cache_data
 def load_data():
-    df = pd.read_excel(r'total.xlsx',parse_dates=['InvoiceDate'])
+    df = pd.read_excel('total.xlsx',parse_dates=['InvoiceDate'])
     return df
 
 df = load_data()
@@ -74,6 +74,36 @@ elif st.session_state['page'] == 'time_series':
     
 
     data = process_data(pharmacy_data)
+
+    def func(n):
+        total = n['ItemsNetPrice'].sum()
+        cash = n[n['InvoiceType'].str.lower().str.contains('normal|online|cash')]
+        cash_sales = ((cash['ItemsNetPrice'].sum())/total)*100
+        insurance = ((n[n['InvoiceType'].str.lower().str.contains('insurance')]['ItemsNetPrice'].sum())/total)*100
+        wasfaty = ((n[n['InvoiceType'].str.lower().str.contains('wasfaty')]['ItemsNetPrice'].sum())/total)*100
+
+        total_trans=n['InvoiceNumber'].nunique()
+        cash_trans=n[n['InvoiceType'].str.lower().str.contains('normal|online|cash')]['InvoiceNumber'].nunique()
+        ins_trans=n[n['InvoiceType'].str.lower().str.contains('insurance')]['InvoiceNumber'].nunique()
+        wasf_trans=n[n['InvoiceType'].str.lower().str.contains('wasfaty')]['InvoiceNumber'].nunique()
+        return pd.Series({
+            'total': total,
+            'cash_sales%': cash_sales,
+            'insurance%': insurance,
+            'wasfaty%': wasfaty,
+            'total_trans%':total_trans,
+            'cash_trans%':cash_trans,
+            'ins_trans%':ins_trans,
+            'wasf_trans%':wasf_trans
+        })
+
+    def process_data(pharmacy_data):
+        dataper = pharmacy_data.groupby(pd.Grouper(key='InvoiceDate', freq='M')).apply(func)
+        return dataper
+    
+
+    dataper = process_data(pharmacy_data)
+    dataper[['total','cash_sales%','insurance%','wasfaty%']]
     total_sales_col=['total','cash_sales','insurance','wasfaty']
     st.dataframe(data[total_sales_col])
     data_scaled=(data-data.min())/(data.max()-data.min())
