@@ -18,11 +18,17 @@ df = load_data()
 
 # --- اختيار الفرع ---
 pharmacy_no = df['BranchCode'].unique().tolist()
+df['InvoiceDate']=pd.to_datetime(df['InvoiceDate'])
 st.sidebar.title('Branch')
-selected_pharmacy = st.sidebar.selectbox(options=pharmacy_no, label='Choose pharmacy')
-pharmacy_data = df[df['BranchCode'] == selected_pharmacy]
-st.sidebar.markdown('[collect data](https://script.google.com/macros/s/AKfycbzXwJ4ExBn6bjPc7RUDmDqlTDfU9Q9dHO1BnjkCICAFAJsaidL8br7RPZZZSDtKP6hf/exec)')
+selected_pharmacy = st.sidebar.multiselect(options=pharmacy_no, label='Choose pharmacy')
+if selected_pharmacy:
+    pharmacy_data=df[df['BranchCode'].isin(selected_pharmacy)]
+else:
+    pharmacy_data=df.copy()
+
+st.sidebar.markdown('[Collect Data](https://script.google.com/macros/s/AKfycbzXwJ4ExBn6bjPc7RUDmDqlTDfU9Q9dHO1BnjkCICAFAJsaidL8br7RPZZZSDtKP6hf/exec)')
 st.sidebar.markdown('[Shortage Tracking](https://script.google.com/macros/s/AKfycby-GiNZC5T3-WoIuhgD-Dxbl9xKOg_wm2cRChhfrim5TRqWYyRnLhwILxginVwIvzgSkw/exec)')
+st.sidebar.markdown('[Contact Branches](https://mgawesh.github.io/contact_us/)')
 # --- تهيئة session_state ---
 if 'page' not in st.session_state:
     st.session_state['page'] = 'home'
@@ -34,11 +40,15 @@ def set_page(page_name):
 # --- القائمة الرئيسية (Home Page) ---
 if st.session_state['page'] == 'home':
     st.markdown(f"<h1 style='text-align: center;'>Branch Number {selected_pharmacy}</h1>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
+    col1, col2,col3 = st.columns(3)
     with col1:
         st.button("🕒 Time Series Analysis", on_click=set_page, args=('time_series',))
     with col2:
         st.button("📦 Category Analysis", on_click=set_page, args=('category_analysis',))
+    with col3:
+        st.button("📈 statistical process control", on_click=set_page, args=('statistical_process_control',))
+
+ 
 
 # --- صفحة تحليل السلاسل الزمنية ---
 elif st.session_state['page'] == 'time_series':
@@ -233,3 +243,84 @@ elif st.session_state['page'] == 'category_analysis':
 
     st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
     
+
+elif st.session_state['page'] == 'statistical_process_control':
+
+    st.markdown("<h2 style='text-align:center;'>📊 Statistical Process Control</h2>", unsafe_allow_html=True)
+    st.markdown("#### level :")
+
+    # تقسيم الصفحة إلى 3 أعمدة
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.button("🧩 Level 1", use_container_width=True, on_click=set_page, args=('level_one',))
+    with col2:
+        st.button("📈 Level 2", use_container_width=True, on_click=set_page, args=('level_two',))
+    with col3:
+        st.button("📊 Level 3", use_container_width=True, on_click=set_page, args=('level_three',))
+    st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
+elif st.session_state['page']=='level_one':
+    st.markdown('Level One (SPC)')
+    def func(n):
+        n=n.sort_values('InvoiceDate')
+        last_date=n['InvoiceDate'].max()
+        last_date_revenu=n[n['InvoiceDate']==last_date]['ItemsNetPrice'].sum()
+        day_of_month=last_date.day
+        last_month=last_date.month
+        last_year=last_date.year
+        current_mtd=n[(n['InvoiceDate'].dt.year==last_year)&
+                      (n['InvoiceDate'].dt.month==last_month)&
+                      (n['InvoiceDate'].dt.day<=day_of_month)]
+        revenu_current=current_mtd['ItemsNetPrice'].sum()
+
+        if last_month==1:
+            prev_month=12
+            prev_year=last_year-1
+        else:
+            prev_month=last_month-1
+            prev_year=last_year
+        prev_mtd=n[(n['InvoiceDate'].dt.month==prev_month)&
+                   (n['InvoiceDate'].dt.year==prev_year)&
+                   (n['InvoiceDate'].dt.day<=day_of_month)]
+        revenu_prev=prev_mtd['ItemsNetPrice'].sum()
+        if revenu_prev != 0:
+            mom=((revenu_current-revenu_prev)/revenu_prev)*100
+        else:
+            mom=None
+        seven_day_MA=n.groupby(pd.Grouper(key='InvoiceDate',freq='D'))['ItemsNetPrice'].sum().rolling(window=7).mean().iloc[-1]
+        deviation=((last_date_revenu-seven_day_MA)/last_date_revenu)*100
+        
+        return pd.Series({'last_day_revenu':last_date_revenu,'revenue_MTD':revenu_current,'MOM%':mom,
+                          '7day_moving_average':seven_day_MA,
+                          'Deviation':deviation})
+    stat=df.groupby('BranchCode').apply(func)
+    stat
+    st.button("⬅️ Back to previous page", on_click=set_page, args=('statistical_process_control',))
+elif st.session_state['page']=='level_two':
+    st.markdown('### level 2 (SPC)')
+    st.markdown('#### I-MR (Individual Moving Range)')
+    daily_sales=pharmacy_data.groupby(pd.Grouper(key='InvoiceDate',freq='D'))['ItemsNetPrice'].sum().reset_index()
+    daily_sales['MR']=daily_sales['ItemsNetPrice'].diff().abs()
+    xbar=daily_sales['ItemsNetPrice'].mean()
+    mrbar=daily_sales['MR'].mean()
+    ucl=xbar+2.66*mrbar
+    lcl=xbar-2.66*mrbar
+    figure,axes=plt.subplots(figsize=(20,5))
+    sns.lineplot(data=daily_sales,x='InvoiceDate',y='ItemsNetPrice',ax=axes)
+    plt.axhline(xbar, color='green', linestyle='--', label='X-bar')
+    plt.axhline(ucl, color='red', linestyle='--', label='UCL')
+    plt.axhline(lcl, color='red', linestyle='--', label='LCL')
+    axes.grid()
+    axes.legend()
+    st.pyplot(figure)
+    st.markdown('#### Days_Below_LCL')
+    below_lcl=daily_sales[daily_sales['ItemsNetPrice']<=lcl]
+    below_lcl
+    st.button('⬅️ Back to prevoius page',on_click=set_page,args=('statistical_process_control',))
+
+elif st.session_state['page']=='level_three':
+    st.markdown('### level 3 (SPC)')
+    st.button('⬅️ Back to prevoius page',on_click=set_page,args=('statistical_process_control',))
+
+    st.divider()  # خط فاصل بسيط
+    st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
