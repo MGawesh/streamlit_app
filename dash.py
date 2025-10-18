@@ -4,14 +4,33 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 import streamlit as st
+st.set_page_config(page_title="Secure Dashboard", page_icon="🔐", layout="wide")
+
+# الباسورد من secrets
 PASSWORD = st.secrets["PASSWORD"]
 
-password = st.text_input("🔑 Enter password:", type="password")
+# حفظ حالة الدخول
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-if password == PASSWORD:
-    st.header("Welcome to your dashboard 🔥")
-else:
-    st.warning("Please enter correct password.")
+# --- واجهة تسجيل الدخول ---
+if not st.session_state.authenticated:
+    st.markdown("<h2 style='text-align:center;'>🔐 Enter Password to Access Dashboard</h2>", unsafe_allow_html=True)
+    password = st.text_input("Password:", type="password", placeholder="Enter password here")
+
+    if password:
+        if password == PASSWORD:
+            st.session_state.authenticated = True
+            st.success("✅ Access granted!")
+            st.rerun()
+        else:
+            st.error("❌ Wrong password.")
+    st.stop()  # يمنع ظهور أي كود للداشبورد قبل التحقق
+
+# --- الداشبورد (يظهر فقط بعد إدخال الباسورد الصحيح) ---
+st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"authenticated": False,}))
+st.markdown("<h1 style='text-align:center;'>📊 Welcome to Your Dashboard</h1>", unsafe_allow_html=True)
+
 st.set_page_config(page_title="Pharmacy Dashboard", layout="wide")
 st.title('Main KPIs')
 
