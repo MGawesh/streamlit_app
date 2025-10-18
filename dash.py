@@ -4,7 +4,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 import streamlit as st
+PASSWORD = st.secrets["PASSWORD"]
 
+password = st.text_input("🔑 Enter password:", type="password")
+
+if password == PASSWORD:
+    st.header("Welcome to your dashboard 🔥")
+else:
+    st.warning("Please enter correct password.")
 st.set_page_config(page_title="Pharmacy Dashboard", layout="wide")
 st.title('Main KPIs')
 
