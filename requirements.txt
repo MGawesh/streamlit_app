@@ -4,4 +4,5 @@ numpy
 matplotlib
 seaborn
 openpyxl
-plotly
+plotly==5.24.1
+prophet==1.1.5

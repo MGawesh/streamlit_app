@@ -4,10 +4,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 import streamlit as st
+import plotly.graph_objects as go
+from prophet import Prophet
+from prophet.plot import plot_plotly
 st.set_page_config(page_title="Secure Dashboard", page_icon="🔐", layout="wide")
 
 # الباسورد من secrets
-PASSWORD = st.secrets["PASSWORD"]
+try:
+    PASSWORD = st.secrets["PASSWORD"]
+except Exception:
+    PASSWORD="1234"
 
 # حفظ حالة الدخول
 if "authenticated" not in st.session_state:
@@ -45,8 +51,17 @@ df = load_data()
 # --- اختيار الفرع ---
 pharmacy_no = df['BranchCode'].unique().tolist()
 df['InvoiceDate']=pd.to_datetime(df['InvoiceDate'])
-st.sidebar.title('Branch')
-selected_pharmacy = st.sidebar.multiselect(options=pharmacy_no, label='Choose pharmacy')
+st.sidebar.title('Choose Pharmacy')
+
+selected_pharmacy = st.sidebar.multiselect(options=pharmacy_no, label='Branch')
+st.sidebar.subheader('Choose Period')
+start_date=st.sidebar.date_input('Start Date',value=df['InvoiceDate'].min(),min_value=df['InvoiceDate'].min(),max_value=df['InvoiceDate'].max())
+end_date=st.sidebar.date_input('End Date',value=df['InvoiceDate'].max(),min_value=df['InvoiceDate'].min(),max_value=df['InvoiceDate'].max())
+if start_date > end_date :
+    st.error('End Date should be after start date')
+else:
+    df=df[(df['InvoiceDate']>=pd.to_datetime(start_date))&(df['InvoiceDate']<=pd.to_datetime(end_date))]
+
 if selected_pharmacy:
     pharmacy_data=df[df['BranchCode'].isin(selected_pharmacy)]
 else:
@@ -331,21 +346,79 @@ elif st.session_state['page']=='level_two':
     mrbar=daily_sales['MR'].mean()
     ucl=xbar+2.66*mrbar
     lcl=xbar-2.66*mrbar
-    figure,axes=plt.subplots(figsize=(20,5))
-    sns.lineplot(data=daily_sales,x='InvoiceDate',y='ItemsNetPrice',ax=axes)
-    plt.axhline(xbar, color='green', linestyle='--', label='X-bar')
-    plt.axhline(ucl, color='red', linestyle='--', label='UCL')
-    plt.axhline(lcl, color='red', linestyle='--', label='LCL')
-    axes.grid()
-    axes.legend()
-    st.pyplot(figure)
+    daily_sales['diff']=daily_sales['ItemsNetPrice'].diff()
+    daily_sales['trend']=np.sign(daily_sales['diff'])
+    daily_sales['down7']=daily_sales['trend'].rolling(window=7).apply(lambda x:(x==-1).all(),raw=True)
+    down7=daily_sales[daily_sales['down7']==1]
+
+    fig = go.Figure()
+
+# 1️⃣ خط المبيعات اليومية
+    fig.add_trace(go.Scatter(
+        x=daily_sales['InvoiceDate'],
+        y=daily_sales['ItemsNetPrice'],
+        mode='lines+markers',
+        name='Sales',
+        line=dict(color='blue'),
+        marker=dict(size=5)))
+
+# 2️⃣ خطوط التحكم
+    fig.add_hline(y=xbar, line=dict(color='green', dash='dash'), annotation_text="X-bar", annotation_position="top left")
+    fig.add_hline(y=ucl, line=dict(color='red', dash='dash'), annotation_text="UCL", annotation_position="top left")
+    fig.add_hline(y=lcl, line=dict(color='red', dash='dash'), annotation_text="LCL", annotation_position="bottom left")
+
+# 3️⃣ النقاط الخاصة بالـ Down7
+    fig.add_trace(go.Scatter(x=down7['InvoiceDate'],y=down7['ItemsNetPrice'],mode='markers',name='7 Days Down End',marker=dict(color='red', size=10, symbol='circle')))
+
+# 4️⃣ إعدادات المخطط
+    fig.update_layout(title='Daily Sales with 7 Days Down Points Highlighted',xaxis_title='Date',yaxis_title='Sales',template='plotly_white',width=1000,height=500)
+
+# 5️⃣ عرض المخطط في Streamlit
+    st.plotly_chart(fig)
+   
+
     st.markdown('#### Days_Below_LCL')
     below_lcl=daily_sales[daily_sales['ItemsNetPrice']<=lcl]
     below_lcl
+    st.markdown('#### Seven_Point_Down')
+    down7
+
+    
+
+# نحسب المبيعات اليومية
+    daily = pharmacy_data.groupby('InvoiceDate')['ItemsNetPrice'].sum().reset_index()
+
+# Prophet لازم الأعمدة تكون بالاسمين دول تحديدًا:
+    daily.rename(columns={'InvoiceDate': 'ds', 'ItemsNetPrice': 'y'}, inplace=True)
+
+# إنشاء النموذج
+    model = Prophet()
+
+# تدريب النموذج
+    model.fit(daily)
+
+# عمل توقع لـ 30 يوم قدام مثلاً
+    future = model.make_future_dataframe(periods=30)
+    forecast = model.predict(future)
+    forecast
+    
+
+
+# رسم النتيجة
+    fig_forecast = plot_plotly(model, forecast)
+    st.plotly_chart(fig_forecast, use_container_width=True)
+
+# --- عرض مكونات النموذج (trend, weekly, yearly) ---
+    st.subheader("🧭 Components")
+    fig_components = model.plot_components(forecast)
+    st.pyplot(fig_components)
+
+
     st.button('⬅️ Back to prevoius page',on_click=set_page,args=('statistical_process_control',))
 
 elif st.session_state['page']=='level_three':
     st.markdown('### level 3 (SPC)')
+    st.markdown('#### Root Cause Analysis')
     st.button('⬅️ Back to prevoius page',on_click=set_page,args=('statistical_process_control',))
 
     st.divider()  # خط فاصل بسيط
