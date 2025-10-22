@@ -35,7 +35,7 @@ if not st.session_state.authenticated:
 
 # --- الداشبورد (يظهر فقط بعد إدخال الباسورد الصحيح) ---
 st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"authenticated": False,}))
-st.markdown("<h1 style='text-align:center;'>📊 Welcome to Your Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center;'>📊 Branches Dashboard</h1>", unsafe_allow_html=True)
 
 st.set_page_config(page_title="Pharmacy Dashboard", layout="wide")
 st.title('Main KPIs')
@@ -66,6 +66,27 @@ if selected_pharmacy:
     pharmacy_data=df[df['BranchCode'].isin(selected_pharmacy)]
 else:
     pharmacy_data=df.copy()
+
+cash=df[df['InvoiceType'].str.lower().str.contains('normal|cash|online')]
+insurance=df[df['InvoiceType'].str.lower().str.contains('insurance')]
+wasfaty=df[df['InvoiceType'].str.lower().str.contains('wasfaty')]
+selected_category=st.sidebar.multiselect(options=['cash','insurance','wasfaty'],label='Category')
+if selected_category:
+    frames=[]
+    if 'cash' in selected_category:
+        frames.append(cash)
+    if 'insurance' in selected_category:
+        frames.append(insurance)
+    if 'wasfaty' in selected_category:
+        frames.append(wasfaty)
+    pharmacy_data=pd.concat(frames)
+
+    
+else:
+    pharmacy_data=df.copy()
+
+
+
 
 st.sidebar.markdown('[Collect Data](https://script.google.com/macros/s/AKfycbzXwJ4ExBn6bjPc7RUDmDqlTDfU9Q9dHO1BnjkCICAFAJsaidL8br7RPZZZSDtKP6hf/exec)')
 st.sidebar.markdown('[Shortage Tracking](https://script.google.com/macros/s/AKfycby-GiNZC5T3-WoIuhgD-Dxbl9xKOg_wm2cRChhfrim5TRqWYyRnLhwILxginVwIvzgSkw/exec)')
