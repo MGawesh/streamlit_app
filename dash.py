@@ -532,28 +532,39 @@ elif st.session_state['page']=='level_two':
 
 # Prophet لازم الأعمدة تكون بالاسمين دول تحديدًا:
     daily.rename(columns={'InvoiceDate': 'ds', 'ItemsNetPrice': 'y'}, inplace=True)
+    model = NeuralProphet()
+    model.fit(daily, freq='D')
+    future = model.make_future_dataframe(daily, periods=30)
+    forecast = model.predict(future)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=daily['ds'], y=daily['y'], mode='lines', name='Actual'))
+    fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat1'], mode='lines', name='Forecast'))
+    fig.update_layout(title="📈 NeuralProphet Forecast", template="plotly_white")
+    st.plotly_chart(fig, use_container_width=True)
+
 
 # إنشاء النموذج
-    model = Prophet()
+    #model = Prophet()
 
 # تدريب النموذج
-    model.fit(daily)
+    #model.fit(daily)
 
 # عمل توقع لـ 30 يوم قدام مثلاً
-    future = model.make_future_dataframe(periods=30)
-    forecast = model.predict(future)
-    forecast
+    #future = model.make_future_dataframe(periods=30)
+    #forecast = model.predict(future)
+    #forecast
     
 
 
 # رسم النتيجة
-    fig_forecast = plot_plotly(model, forecast)
-    st.plotly_chart(fig_forecast, use_container_width=True)
+    #fig_forecast = plot_plotly(model, forecast)
+    #st.plotly_chart(fig_forecast, use_container_width=True)
 
 # --- عرض مكونات النموذج (trend, weekly, yearly) ---
-    st.subheader("🧭 Components")
-    fig_components = model.plot_components(forecast)
-    st.pyplot(fig_components)
+    #st.subheader("🧭 Components")
+    #fig_components = model.plot_components(forecast)
+    #st.pyplot(fig_components)
 
 
     st.button('⬅️ Back to prevoius page',on_click=set_page,args=('statistical_process_control',))

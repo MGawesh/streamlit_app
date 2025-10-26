@@ -7,3 +7,5 @@ openpyxl
 plotly==5.24.1
 neuralprophet
 torch
+cmdstanpy
+prophet
