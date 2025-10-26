@@ -45,45 +45,67 @@ st.title('Main KPIs')
 def load_data():
     df = pd.read_excel('total.xlsx',parse_dates=['InvoiceDate'])
     return df
+    
 
 df = load_data()
+def func(n):
+    if len(str(n))==2:
+        return f'P0{n}'
+    else:
+        return f'P{n}'
+df['BranchCode']=df['BranchCode'].apply(func)
 
+@st.cache_data
+def load_fraction():
+    fraction=pd.read_excel('fraction.xlsx')
+    return fraction
+fraction=load_fraction()
 # --- اختيار الفرع ---
+# --- تحويل التاريخ وتنظيم البيانات الأساسية ---
+# --- تحويل التاريخ وتنظيم البيانات الأساسية ---
+df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
 pharmacy_no = df['BranchCode'].unique().tolist()
-df['InvoiceDate']=pd.to_datetime(df['InvoiceDate'])
-st.sidebar.title('Choose Pharmacy')
 
-selected_pharmacy = st.sidebar.multiselect(options=pharmacy_no, label='Branch')
-st.sidebar.subheader('Choose Period')
-start_date=st.sidebar.date_input('Start Date',value=df['InvoiceDate'].min(),min_value=df['InvoiceDate'].min(),max_value=df['InvoiceDate'].max())
-end_date=st.sidebar.date_input('End Date',value=df['InvoiceDate'].max(),min_value=df['InvoiceDate'].min(),max_value=df['InvoiceDate'].max())
-if start_date > end_date :
-    st.error('End Date should be after start date')
+# --- عناصر الفلترة في الـ Sidebar ---
+st.sidebar.title('Filters')
+
+selected_pharmacy = st.sidebar.multiselect('Choose Pharmacy', options=pharmacy_no)
+start_date = st.sidebar.date_input('Start Date', value=df['InvoiceDate'].min())
+end_date = st.sidebar.date_input('End Date', value=df['InvoiceDate'].max())
+
+selected_category = st.sidebar.multiselect(
+    'Select Category',
+    options=['cash', 'insurance', 'wasfaty'],
+    default=[]
+)
+
+# --- تحقق من التواريخ ---
+if start_date > end_date:
+    st.error('⚠️ End Date must be after Start Date')
 else:
-    df=df[(df['InvoiceDate']>=pd.to_datetime(start_date))&(df['InvoiceDate']<=pd.to_datetime(end_date))]
+    # فلترة أولية بناءً على التاريخ
+    filtered = df[
+        (df['InvoiceDate'] >= pd.to_datetime(start_date)) &
+        (df['InvoiceDate'] <= pd.to_datetime(end_date))
+    ]
 
-if selected_pharmacy:
-    pharmacy_data=df[df['BranchCode'].isin(selected_pharmacy)]
-else:
-    pharmacy_data=df.copy()
+    # فلترة حسب نوع الفاتورة
+    if selected_category:
+        mask = (
+            (df['InvoiceType'].str.lower().str.contains('normal|cash|online') if 'cash' in selected_category else False) |
+            (df['InvoiceType'].str.lower().str.contains('insurance') if 'insurance' in selected_category else False) |
+            (df['InvoiceType'].str.lower().str.contains('wasfaty') if 'wasfaty' in selected_category else False)
+        )
+        filtered = filtered[mask]
 
-cash=df[df['InvoiceType'].str.lower().str.contains('normal|cash|online')]
-insurance=df[df['InvoiceType'].str.lower().str.contains('insurance')]
-wasfaty=df[df['InvoiceType'].str.lower().str.contains('wasfaty')]
-selected_category=st.sidebar.multiselect(options=['cash','insurance','wasfaty'],label='Category')
-if selected_category:
-    frames=[]
-    if 'cash' in selected_category:
-        frames.append(cash)
-    if 'insurance' in selected_category:
-        frames.append(insurance)
-    if 'wasfaty' in selected_category:
-        frames.append(wasfaty)
-    pharmacy_data=pd.concat(frames)
+    # فلترة حسب الفروع
+    if selected_pharmacy:
+        filtered = filtered[filtered['BranchCode'].isin(selected_pharmacy)]
+
+    # النتيجة النهائية
+    pharmacy_data = filtered.copy()
 
     
-else:
-    pharmacy_data=df.copy()
 
 
 
@@ -102,13 +124,15 @@ def set_page(page_name):
 # --- القائمة الرئيسية (Home Page) ---
 if st.session_state['page'] == 'home':
     st.markdown(f"<h1 style='text-align: center;'>Branch Number {selected_pharmacy}</h1>", unsafe_allow_html=True)
-    col1, col2,col3 = st.columns(3)
+    col1, col2,col3,col4 = st.columns(4)
     with col1:
         st.button("🕒 Time Series Analysis", on_click=set_page, args=('time_series',))
     with col2:
         st.button("📦 Category Analysis", on_click=set_page, args=('category_analysis',))
     with col3:
         st.button("📈 statistical process control", on_click=set_page, args=('statistical_process_control',))
+    with col4:
+        st.button('📦 Inventory Optimization',on_click=set_page,args=('Inventory Optimization',))
 
  
 
@@ -116,6 +140,8 @@ if st.session_state['page'] == 'home':
 elif st.session_state['page'] == 'time_series':
     st.markdown(f"<h1 style='text-align: center;'>📈 Time Series Analysis - Branch {selected_pharmacy}</h1>", unsafe_allow_html=True)
     st.markdown("### Sales Category")
+
+    
 
     # -------- التحليل الأول (Sales Category) --------
     def func(n):
@@ -200,6 +226,7 @@ elif st.session_state['page'] == 'time_series':
 
     st.markdown('----')
     st.subheader('SALES KPIs')
+    
 
     # -------- التحليل الثاني (KPIs) --------
     def func_kpi(n):
@@ -231,7 +258,11 @@ elif st.session_state['page'] == 'time_series':
     plt.tight_layout()
     st.pyplot(plt)
 
-    st.markdown('----')
+    st.markdown('-----')
+    st.button('pharmacist level',on_click=set_page,args=('pharmacist_level',))
+    st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
+elif st.session_state['page']=='pharmacist_level':
+        
     st.subheader('PHARMACIST PERFORMANCE')
     st.text('Avg_daily_sales_for_every_pharmacist')
 
@@ -240,21 +271,106 @@ elif st.session_state['page'] == 'time_series':
         return pd.Series({'avg_daily':avg_daily})
     avg_sales=pharmacy_data.groupby([pd.Grouper(key='InvoiceDate',freq='M'),'SalesName']).apply(func).unstack()
     avg_sales
-    
-
-# رسم خط لكل صيدلي
-    fig,ax =plt.subplots(figsize=(12,8))
+    fig,ax =plt.subplots(figsize=(10,4))
     for col in avg_sales.columns:
         sns.lineplot(data=avg_sales,x=avg_sales.index,y=col,label=col)
     plt.grid()
     plt.legend()
     st.pyplot(fig)
 
+    def func_kpi(n):
+        cash = n[n['InvoiceType'].str.lower().str.contains('normal|cash|online')]
+        apt = cash['ItemsNetPrice'].sum() / cash['InvoiceNumber'].nunique()
+        rsp = cash['ItemsNetPrice'].sum() / cash['Quantity'].sum()
+        bsvolume = cash['Quantity'].sum() / cash['InvoiceNumber'].nunique()
+        transno = cash['InvoiceNumber'].nunique()
+        return pd.Series({
+            'APT': apt.round(2),
+            'RSP': rsp.round(2),
+            'B.S.VOLUME': bsvolume.round(2),
+            'TRANS. NO.': transno
+        })
 
+    def process_kpi(pharmacy_data):
+        kpis_pharmacist = pharmacy_data.groupby([pd.Grouper(key='InvoiceDate', freq='M'),'SalesName']).apply(func_kpi).unstack()
+        return kpis_pharmacist
+
+    kpis_pharmacist = process_kpi(pharmacy_data)
+    st.dataframe(kpis_pharmacist)
+    apt=kpis_pharmacist['APT']
+
+    
+    
+
+
+# إنشاء الشكل
+    fig = go.Figure()
+
+# رسم الخطوط لكل عمود (زي ما كنت بتعمل بـ Seaborn)
+    for col in apt.columns:
+        fig.add_trace(go.Scatter(
+            x=apt.index,
+            y=apt[col],
+            mode='lines+markers',
+            name=col
+    ))
+
+# إضافة الخط الأفقي عند y = 87
+    fig.add_hline(
+        y=87,
+        line_dash="dash",
+        line_color="red",
+        annotation_text="Target = 87",
+        annotation_position="top left"
+)
+
+# تخصيص شكل الرسم
+    fig.update_layout(
+    title="APT Trend by Pharmacist",
+    xaxis_title="Month",
+    yaxis_title="APT",
+    template="plotly_white",
+    height=400,
+    legend=dict(title="Pharmacists")
+)
+
+# عرض الرسم في Streamlit
+    st.plotly_chart(fig, use_container_width=True)
+
+    bsvolume=kpis_pharmacist['B.S.VOLUME']
+    
+    fig = go.Figure()
+    for col in bsvolume.columns:
+        fig.add_trace(go.Scatter(x=bsvolume.index,y=bsvolume[col],mode='lines+markers',name=col))
+    fig.add_hline(y=2.57,line_dash='dash',line_color='red',annotation_text='target = 2.57',annotation_position='top left')
+    fig.update_layout(title='B.S.VOLUME BY PHARMACIST',
+                          xaxis_title='MONTH',
+                          yaxis_title='B.S.VOLUME',
+                          template='plotly_white',
+                          height=400,
+                          legend=dict(title='pharmacists'))
+    st.plotly_chart(fig,use_container_width=True)
+
+    rsp=kpis_pharmacist['RSP']
+    fig=go.Figure()
+    for col in rsp.columns:
+        fig.add_trace(go.Scatter(x=rsp.index,y=rsp[col],mode='lines+markers',name=col))
+    fig.add_hline(y=36,line_dash='dash',line_color='red',annotation_text='target = 36',annotation_position='top left')
+    fig.update_layout(title='RSP',xaxis_title='month',yaxis_title='RSP',template='plotly_white',height=400,legend=dict(title=('pharmacists')))
+    st.plotly_chart(fig,use_container_width=True)
+
+
+    
+    st.button("⬅️ Back to Main Menu", on_click=set_page, args=('time_series',))
+
+    
+    
+
+# رسم خط لكل صيدلي
     
 
     # زر للرجوع للصفحة الرئيسية
-    st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
+    #st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
 
 # --- صفحة تحليل الفئات (Category Analysis) ---
 elif st.session_state['page'] == 'category_analysis':
@@ -372,6 +488,8 @@ elif st.session_state['page']=='level_two':
     daily_sales['down7']=daily_sales['trend'].rolling(window=7).apply(lambda x:(x==-1).all(),raw=True)
     down7=daily_sales[daily_sales['down7']==1]
 
+    
+
     fig = go.Figure()
 
 # 1️⃣ خط المبيعات اليومية
@@ -405,7 +523,7 @@ elif st.session_state['page']=='level_two':
     down7
 
     
-
+    st.markdown('#### PROPHET FORECAST')
 # نحسب المبيعات اليومية
     daily = pharmacy_data.groupby('InvoiceDate')['ItemsNetPrice'].sum().reset_index()
 
@@ -442,5 +560,133 @@ elif st.session_state['page']=='level_three':
     st.markdown('#### Root Cause Analysis')
     st.button('⬅️ Back to prevoius page',on_click=set_page,args=('statistical_process_control',))
 
-    st.divider()  # خط فاصل بسيط
+
+elif st.session_state['page']=='Inventory Optimization':
+    st.markdown('#### PARETO ANALYSIS')
+    pareto=pharmacy_data.groupby('Name')['Quantity'].sum().reset_index().sort_values(by='Quantity',ascending=False)
+    pareto['%']=(pareto['Quantity']/pareto['Quantity'].sum())*100
+    pareto['cumsum']=pareto['%'].cumsum()
+    pareto_items=pareto[pareto['cumsum']<=80]
+    pareto_items_count=pareto_items['Name'].count()
+    pareto_count=pareto['Name'].count()
+    contrib=round((pareto_items_count/pareto_count)*100,2)
+    st.markdown(f"#### {contrib} % of items represent 80% of sold items {[pareto_items_count]}")
+    pareto_items
+    
+
+    
+    @st.cache_data
+    def load_stock():
+        stock=pd.read_excel('209 stock.xlsx')
+        return stock
+    stock=load_stock()
+    stock['Branch']=stock['Branch'].astype(str)
+    stock=stock[['MaterialName','Branch','UnRestrictedStock']]
+    
+    st.markdown('#### forecast')
+# تحويل رقم الفاتورة لنص (احتياطي)
+    pharmacy_data['InvoiceNumber'] = pharmacy_data['InvoiceNumber'].astype(str)
+
+
+
+# ---- تعديل fraction بكفاءة ----
+    fraction_sum = fraction.groupby(['Name', 'UnitOfMeasurement'])['unit'].sum().reset_index()
+# نعمل merge بدل ما نلف بـ for loop
+    pharmacy_data = pharmacy_data.merge(
+    fraction_sum,
+    on=['Name', 'UnitOfMeasurement'],
+    how='left'
+)
+# تحديث الكمية فقط للصفوف اللي عندها قيمة fraction
+    pharmacy_data['Quantity'] = np.where(
+        pharmacy_data['unit'].notna(),
+        pharmacy_data['unit'],
+        pharmacy_data['Quantity']
+)
+    pharmacy_data.drop(columns=['unit'], inplace=True)
+
+# ---- حساب الفرق الزمني بالشهور ----
+    max_date = pharmacy_data['InvoiceDate'].max()
+    pharmacy_data['month'] = ((max_date - pharmacy_data['InvoiceDate']).dt.days // 30)
+
+# ---- Pivot Table ----
+    cleaned_pivot = pharmacy_data.pivot_table(
+    index=['BranchCode', 'Name'],
+    columns='month',
+    values='Quantity',
+    aggfunc='sum',
+    fill_value=0
+)
+
+# ---- حساب المتوسطات ----
+# بدلاً من 3 apply، نستخدم mean vectorized
+    for i, col_range in enumerate([[0,1,2], [3,4,5], [6,7,8]], start=1):
+        cols = [c for c in col_range if c in cleaned_pivot.columns]
+        cleaned_pivot[f'avgq{i}'] = cleaned_pivot[cols].mean(axis=1)
+
+# ---- Forecast بشكل أسرع ----
+    avgq1, avgq2, avgq3 = cleaned_pivot['avgq1'], cleaned_pivot['avgq2'], cleaned_pivot['avgq3']
+
+
+    conditions = [
+    (cleaned_pivot['avgq1'] > 3 * (cleaned_pivot['avgq2'] + cleaned_pivot['avgq3']) / 2),
+    (cleaned_pivot['avgq2'] > 3 * (cleaned_pivot['avgq1'] + cleaned_pivot['avgq3']) / 2),
+    (cleaned_pivot['avgq3'] > 3 * (cleaned_pivot['avgq2'] + cleaned_pivot['avgq1']) / 2),
+    ((cleaned_pivot['avgq1'] + cleaned_pivot['avgq2']) / 2 > cleaned_pivot['avgq3'] * 3),
+    ((cleaned_pivot['avgq1'] + cleaned_pivot['avgq3']) / 2 > cleaned_pivot['avgq2'] * 3),
+    ((cleaned_pivot['avgq3'] + cleaned_pivot['avgq2']) / 2 > cleaned_pivot['avgq1'] * 3)
+]
+
+    choices = [
+    cleaned_pivot['avgq1'],
+    cleaned_pivot['avgq2'],
+    cleaned_pivot['avgq3'],
+    (cleaned_pivot['avgq1'] + cleaned_pivot['avgq2']) / 2,
+    (cleaned_pivot['avgq1'] + cleaned_pivot['avgq3']) / 2,
+    (cleaned_pivot['avgq3'] + cleaned_pivot['avgq2']) / 2
+]
+
+# القيمة الافتراضية لو مفيش شرط اتحقق
+    default = (cleaned_pivot['avgq1'] * 0.6) + (cleaned_pivot['avgq2'] * 0.25) + (cleaned_pivot['avgq3'] * 0.15)
+
+    cleaned_pivot['forecast'] = np.select(conditions, choices, default=default)
+
+    cleaned_pivot['dailyforecast'] = cleaned_pivot['forecast'] / 30
+
+
+    conditions = [
+    cleaned_pivot['forecast'] > 50,
+    cleaned_pivot['forecast'] >= 6,
+    cleaned_pivot['forecast'] < 6
+]
+    min_values = [cleaned_pivot['dailyforecast'] * 16,
+              cleaned_pivot['dailyforecast'] * 20,
+              cleaned_pivot['dailyforecast'] * 35]
+    max_values = [cleaned_pivot['dailyforecast'] * 24,
+              cleaned_pivot['dailyforecast'] * 28,
+              cleaned_pivot['dailyforecast'] * 50]
+
+    cleaned_pivot['min'] = np.select(conditions, min_values)
+    cleaned_pivot['max'] = np.select(conditions, max_values)
+
+# النتيجة النهائية
+    cleaned_pivot = cleaned_pivot.reset_index()
+    cleaned_pivot['BranchCode']=cleaned_pivot['BranchCode'].astype(str)
+    cleaned_pivot[['BranchCode','Name','forecast','dailyforecast','min','max']]
+    
+    st.markdown('#### Shortage (pareto_items)')
+    final_forcast=cleaned_pivot.merge(stock,left_on=['BranchCode','Name'],right_on=['Branch','MaterialName'],how='left')
+    
+    merged=final_forcast[final_forcast['Name'].isin(pareto_items['Name'])]
+    merged[merged['UnRestrictedStock']<.5*merged['min']][['BranchCode','Name','min','UnRestrictedStock']]
+
+    st.markdown('#### OVERSTOCK')
+    final_forcast[final_forcast['UnRestrictedStock']>1.5*final_forcast['max']][['BranchCode','Name','max','UnRestrictedStock']]
+    
+
+
+    
+
     st.button("⬅️ Back to Main Menu", on_click=set_page, args=('home',))
+
+    
