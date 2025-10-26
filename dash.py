@@ -4,13 +4,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 import streamlit as st
+st.set_page_config(page_title="Secure Dashboard", page_icon="🔐", layout="wide")
 import plotly.graph_objects as go
 from prophet import Prophet
 from prophet.plot import plot_plotly
 #from prophet import Prophet
 #import plotly.graph_objects as go
 
-st.set_page_config(page_title="Secure Dashboard", page_icon="🔐", layout="wide")
+#st.set_page_config(page_title="Secure Dashboard", page_icon="🔐", layout="wide")
 
 # الباسورد من secrets
 try:
