@@ -5,5 +5,5 @@ matplotlib
 seaborn
 openpyxl
 plotly==5.24.1
-cmdstanpy
-prophet==1.1.5
+neuralprophet
+torch
